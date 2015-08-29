@@ -45,6 +45,10 @@ describe('gulp provider', function() {
     });
   });
 
+  afterEach(function() {
+    fs.removeSync(directory);
+  });
+
   it('should show the build window when a gulp-file exists', function() {
     expect(workspaceElement.querySelector('.build')).not.toExist();
 
