@@ -1,5 +1,5 @@
 # Gulp runner for Atom
-[![Build Status](https://travis-ci.org/noseglid/atom-build-make.svg)](https://travis-ci.org/noseglid/atom-build-make)
+[![Build Status](https://travis-ci.org/noseglid/atom-build-gulp.svg)](https://travis-ci.org/noseglid/atom-build-gulp)
 [![Gitter chat](https://badges.gitter.im/noseglid/atom-build.svg)](https://gitter.im/noseglid/atom-build)
 
 Uses the [atom-build](https://github.com/noseglid/atom-build) package to execute
