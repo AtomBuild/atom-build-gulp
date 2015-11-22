@@ -56,6 +56,13 @@ describe('gulp provider', function() {
 
     runs(function () {
       fs.writeFileSync(directory + 'gulpfile.js', fs.readFileSync(__dirname + '/gulpfile.js'));
+    });
+
+    waitsForPromise(function () {
+      return specHelpers.refreshAwaitTargets();
+    });
+
+    runs(function () {
       atom.commands.dispatch(workspaceElement, 'build:trigger');
     });
 
@@ -74,6 +81,14 @@ describe('gulp provider', function() {
     fs.writeFileSync(directory + 'gulpfile.js', fs.readFileSync(__dirname + '/gulpfile.js'));
     atom.commands.dispatch(workspaceElement, 'build:trigger');
 
+    waitsForPromise(function () {
+      return specHelpers.refreshAwaitTargets();
+    });
+
+    runs(function () {
+      atom.commands.dispatch(workspaceElement, 'build:trigger');
+    });
+
     waitsFor(function() {
       return workspaceElement.querySelector('.build .title') &&
         workspaceElement.querySelector('.build .title').classList.contains('error');
@@ -87,6 +102,10 @@ describe('gulp provider', function() {
   it('should list gulp targets in a SelectListView', function () {
     waitsForPromise(setupGulp);
     fs.writeFileSync(directory + 'gulpfile.js', fs.readFileSync(__dirname + '/gulpfile.js'));
+
+    waitsForPromise(function () {
+      return specHelpers.refreshAwaitTargets();
+    });
 
     runs(function () {
       atom.commands.dispatch(workspaceElement, 'build:select-active-target');
@@ -107,6 +126,10 @@ describe('gulp provider', function() {
 
   it('should still list the default target for gulp even if targetextraction fails', function () {
     fs.writeFileSync(directory + 'gulpfile.js', fs.readFileSync(__dirname + '/gulpfile.js'));
+
+    waitsForPromise(function () {
+      return specHelpers.refreshAwaitTargets();
+    });
 
     runs(function () {
       atom.commands.dispatch(workspaceElement, 'build:select-active-target');
