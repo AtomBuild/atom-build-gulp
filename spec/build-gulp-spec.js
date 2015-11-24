@@ -1,127 +1,80 @@
-'use strict';
+'use babel';
 
-var temp = require('temp');
-var path = require('path');
-var fs = require('fs-extra');
-var specHelpers = require('atom-build-spec-helpers');
+import temp from 'temp';
+import path from 'path';
+import fs from 'fs-extra';
+import specHelpers from 'atom-build-spec-helpers';
+import { provideBuilder } from '../lib/gulp';
 
-describe('gulp provider', function() {
-  var directory;
-  var workspaceElement;
+describe('gulp provider', () => {
+  let directory;
+  const builder = provideBuilder();
 
-  var setupGulp = function () {
-    var binGulp = path.join(directory, 'node_modules', '.bin', 'gulp');
-    var realGulp = path.join(directory, 'node_modules', 'gulp', 'bin', 'gulp.js');
-    var source = path.join(__dirname, 'node_modules');
-    var target = path.join(directory, 'node_modules');
-    return specHelpers.vouch(fs.copy, source, target).then(function () {
+  const setupGulp = () => {
+    const binGulp = path.join(directory, 'node_modules', '.bin', 'gulp');
+    const realGulp = path.join(directory, 'node_modules', 'gulp', 'bin', 'gulp.js');
+    const source = path.join(__dirname, 'fixture/node_modules');
+    const target = path.join(directory, 'node_modules');
+    return specHelpers.vouch(fs.copy, source, target).then(() => {
       return Promise.all([
         specHelpers.vouch(fs.unlink, binGulp),
         specHelpers.vouch(fs.chmod, realGulp, parseInt('0700', 8))
       ]);
-    }).then(function () {
+    }).then(() => {
       return specHelpers.vouch(fs.symlink, realGulp, binGulp);
     });
   };
 
-  beforeEach(function () {
-    workspaceElement = atom.views.getView(atom.workspace);
-    jasmine.attachToDOM(workspaceElement);
-    jasmine.unspy(window, 'setTimeout');
-    jasmine.unspy(window, 'clearTimeout');
-
-    waitsForPromise(function() {
-      return specHelpers.vouch(temp.mkdir, 'atom-build-spec-').then(function (dir) {
-        return specHelpers.vouch(fs.realpath, dir);
-      }).then(function (dir) {
-        directory = dir + '/';
-        atom.project.setPaths([ directory ]);
-      }).then(function () {
-        return Promise.all([
-          atom.packages.activatePackage('build'),
-          atom.packages.activatePackage('build-gulp')
-        ]);
-      });
+  beforeEach(() => {
+    waitsForPromise(() => {
+      return specHelpers.vouch(temp.mkdir, 'atom-build-spec-')
+        .then((dir) => specHelpers.vouch(fs.realpath, dir))
+        .then((dir) => atom.project.setPaths([ directory = `${dir}/` ]));
     });
   });
 
-  afterEach(function() {
+  afterEach(() => {
     fs.removeSync(directory);
   });
 
-  it('should show the build window when a gulp-file exists', function() {
-    expect(workspaceElement.querySelector('.build')).not.toExist();
-
-    waitsForPromise(setupGulp);
-
-    runs(function () {
-      fs.writeFileSync(directory + 'gulpfile.js', fs.readFileSync(__dirname + '/gulpfile.js'));
-      atom.commands.dispatch(workspaceElement, 'build:trigger');
+  describe('when gulpfile.js with locally installed gulp', () => {
+    beforeEach(() => {
+      waitsForPromise(setupGulp);
+      runs(() => fs.writeFileSync(directory + 'gulpfile.js', fs.readFileSync(__dirname + '/fixture/gulpfile.js')));
     });
 
-    waitsFor(function() {
-      return workspaceElement.querySelector('.build .title') &&
-        workspaceElement.querySelector('.build .title').classList.contains('success');
+    it('should be eligible', () => {
+      runs(() => expect(builder.isEligable(directory)).toEqual(true));
     });
 
-    runs(function() {
-      expect(workspaceElement.querySelector('.build')).toExist();
-      expect(workspaceElement.querySelector('.build .output').textContent).toMatch(/gulp built/);
-    });
-  });
-
-  it('should run default target and fail if gulp is not installed', function () {
-    fs.writeFileSync(directory + 'gulpfile.js', fs.readFileSync(__dirname + '/gulpfile.js'));
-    atom.commands.dispatch(workspaceElement, 'build:trigger');
-
-    waitsFor(function() {
-      return workspaceElement.querySelector('.build .title') &&
-        workspaceElement.querySelector('.build .title').classList.contains('error');
-    });
-
-    runs(function() {
-      expect(workspaceElement.querySelector('.build .output').textContent).toMatch(/^Executing: gulp/);
-    });
-  });
-
-  it('should list gulp targets in a SelectListView', function () {
-    waitsForPromise(setupGulp);
-    fs.writeFileSync(directory + 'gulpfile.js', fs.readFileSync(__dirname + '/gulpfile.js'));
-
-    runs(function () {
-      atom.commands.dispatch(workspaceElement, 'build:select-active-target');
-    });
-
-    waitsFor(function () {
-      return workspaceElement.querySelector('.select-list li.build-target');
-    });
-
-    runs(function () {
-      var list = workspaceElement.querySelectorAll('.select-list li.build-target');
-      var targets = Array.prototype.slice.call(list).map(function (el) {
-        return el.textContent;
+    it('should use gulp to list targets', () => {
+      waitsForPromise(() => {
+        return builder.settings(directory).then(settings => {
+          const expected = [ 'Gulp: default', 'Gulp: dev build', 'Gulp: watch' ].sort();
+          const real = settings.map(s => s.name).sort();
+          expect(expected).toEqual(real);
+        });
       });
-      expect(targets).toEqual([ 'Gulp: default', 'Gulp: dev build', 'Gulp: watch' ]);
     });
   });
 
-  it('should still list the default target for gulp even if targetextraction fails', function () {
-    fs.writeFileSync(directory + 'gulpfile.js', fs.readFileSync(__dirname + '/gulpfile.js'));
-
-    runs(function () {
-      atom.commands.dispatch(workspaceElement, 'build:select-active-target');
+  describe('when gulpfile.js exists but no local gulp is installed', () => {
+    beforeEach(() => {
+      fs.writeFileSync(directory + 'gulpfile.js', fs.readFileSync(__dirname + '/fixture/gulpfile.js'));
     });
 
-    waitsFor(function () {
-      return workspaceElement.querySelector('.select-list li.build-target');
+    it('should be eligible', () => {
+      runs(() => expect(builder.isEligable(directory)).toEqual(true));
     });
 
-    runs(function () {
-      var list = workspaceElement.querySelectorAll('.select-list li.build-target');
-      var targets = Array.prototype.slice.call(list).map(function (el) {
-        return el.textContent;
+    it('should list the default target', () => {
+      waitsForPromise(() => {
+        return builder.settings(directory).then(settings => {
+          const expected = [ 'Gulp: default' ];
+          const real = settings.map(s => s.name);
+          expect(expected).toEqual(real);
+        });
       });
-      expect(targets).toEqual([ 'Gulp: default' ]);
     });
   });
 });
