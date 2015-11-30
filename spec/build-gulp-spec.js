@@ -37,14 +37,20 @@ describe('gulp provider', () => {
     fs.removeSync(directory);
   });
 
-  describe('when gulpfile.js with locally installed gulp', () => {
+  describe('when no gulpfile.js exists', () => {
+    it('should not be eligible', () => {
+      expect(builder.isEligable(directory)).toEqual(false);
+    });
+  })
+
+  describe('when gulpfile.js exists with locally installed gulp', () => {
     beforeEach(() => {
       waitsForPromise(setupGulp);
       runs(() => fs.writeFileSync(directory + 'gulpfile.js', fs.readFileSync(__dirname + '/fixture/gulpfile.js')));
     });
 
     it('should be eligible', () => {
-      runs(() => expect(builder.isEligable(directory)).toEqual(true));
+      expect(builder.isEligable(directory)).toEqual(true);
     });
 
     it('should use gulp to list targets', () => {
@@ -56,6 +62,18 @@ describe('gulp provider', () => {
         });
       });
     });
+
+    it('should export correct settings', () => {
+      waitsForPromise(() => {
+        return builder.settings(directory).then(settings => {
+          expect(settings.length).toBe(3);
+          const target = settings.find(s => s.name === 'Gulp: watch');
+          expect(target.sh).toBe(false);
+          expect(target.args).toEqual([ 'watch' ]);
+          expect(target.exec).toBe(`${directory}node_modules/.bin/gulp`);
+        });
+      });
+    })
   });
 
   describe('when gulpfile.js exists but no local gulp is installed', () => {
@@ -73,6 +91,18 @@ describe('gulp provider', () => {
           const expected = [ 'Gulp: default' ];
           const real = settings.map(s => s.name);
           expect(expected).toEqual(real);
+        });
+      });
+    });
+
+    it('should export correct settings', () => {
+      waitsForPromise(() => {
+        return builder.settings(directory).then(settings => {
+          expect(settings.length).toBe(1);
+          const target = settings.find(s => s.name === 'Gulp: default');
+          expect(target.sh).toBe(false);
+          expect(target.args).toEqual([ 'default' ]);
+          expect(target.exec).toBe('gulp');
         });
       });
     });
