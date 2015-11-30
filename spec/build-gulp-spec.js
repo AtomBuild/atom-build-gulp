@@ -42,7 +42,7 @@ describe('gulp provider', () => {
     fs.removeSync(directory);
   });
 
-  describe('when no gulpfile.js exists', () => {
+  describe('when no gulpfile (any extension) exists', () => {
     it('should not be eligible', () => {
       expect(builder.isEligible()).toEqual(false);
     });
@@ -109,11 +109,12 @@ describe('gulp provider', () => {
     });
 
     it('should be eligible', () => {
-      runs(() => expect(builder.isEligible()).toEqual(true));
+      expect(builder.isEligible()).toEqual(true);
     });
 
     it('should list the default target', () => {
       waitsForPromise(() => {
+        expect(builder.isEligible()).toEqual(true);
         return builder.settings().then(settings => {
           const expected = [ 'Gulp: default' ];
           const real = settings.map(s => s.name);
@@ -124,12 +125,35 @@ describe('gulp provider', () => {
 
     it('should export correct settings', () => {
       waitsForPromise(() => {
+        expect(builder.isEligible()).toEqual(true);
         return builder.settings().then(settings => {
           expect(settings.length).toBe(1);
           const target = settings.find(s => s.name === 'Gulp: default');
           expect(target.sh).toBe(false);
           expect(target.args).toEqual([ 'default' ]);
           expect(target.exec).toBe('gulp');
+        });
+      });
+    });
+  });
+
+  describe('when gulpfile.babel.js exists with locally installed gulp', () => {
+    beforeEach(() => {
+      waitsForPromise(setupGulp);
+      runs(() => fs.writeFileSync(directory + 'gulpfile.babel.js', fs.readFileSync(__dirname + '/fixture/gulpfile.babel.js')));
+      runs(() => fs.writeFileSync(directory + '.babelrc', fs.readFileSync(__dirname + '/fixture/.babelrc')));
+    });
+
+    it('should export correct settings', () => {
+      expect(builder.isEligible()).toEqual(true);
+      waitsForPromise(() => {
+        return builder.settings().then(settings => {
+          expect(settings.length).toBe(2);
+          expect(settings.map(s => s.name).sort()).toEqual([ 'Gulp: babel-task-1', 'Gulp: babel-task-2' ].sort());
+          const target = settings.find(s => s.name === 'Gulp: babel-task-1');
+          expect(target.sh).toBe(false);
+          expect(target.args).toEqual([ 'babel-task-1' ]);
+          expect(target.exec).toBe(`${directory}node_modules/.bin/gulp`);
         });
       });
     });
