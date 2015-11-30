@@ -11,10 +11,10 @@ describe('gulp provider', () => {
   let builder;
   const Builder = provideBuilder();
 
-  const setupGulp = () => {
+  const setupGulp = (preset) => {
     const binGulp = path.join(directory, 'node_modules', '.bin', 'gulp');
     const realGulp = path.join(directory, 'node_modules', 'gulp', 'bin', 'gulp.js');
-    const source = path.join(__dirname, 'fixture/node_modules');
+    const source = path.join(__dirname, 'fixture', `node_modules_${preset}`);
     const target = path.join(directory, 'node_modules');
     return specHelpers.vouch(fs.copy, source, target).then(() => {
       return Promise.all([
@@ -50,7 +50,7 @@ describe('gulp provider', () => {
 
   describe('when gulpfile.js exists with locally installed gulp', () => {
     beforeEach(() => {
-      waitsForPromise(setupGulp);
+      waitsForPromise(setupGulp.bind(null, 'gulp'));
       runs(() => fs.writeFileSync(directory + 'gulpfile.js', fs.readFileSync(__dirname + '/fixture/gulpfile.js')));
     });
 
@@ -139,7 +139,7 @@ describe('gulp provider', () => {
 
   describe('when gulpfile.babel.js exists with locally installed gulp', () => {
     beforeEach(() => {
-      waitsForPromise(setupGulp);
+      waitsForPromise(setupGulp.bind(null, 'babel'));
       runs(() => fs.writeFileSync(directory + 'gulpfile.babel.js', fs.readFileSync(__dirname + '/fixture/gulpfile.babel.js')));
       runs(() => fs.writeFileSync(directory + '.babelrc', fs.readFileSync(__dirname + '/fixture/.babelrc')));
     });
@@ -153,6 +153,27 @@ describe('gulp provider', () => {
           const target = settings.find(s => s.name === 'Gulp: babel-task-1');
           expect(target.sh).toBe(false);
           expect(target.args).toEqual([ 'babel-task-1' ]);
+          expect(target.exec).toBe(`${directory}node_modules/.bin/gulp`);
+        });
+      });
+    });
+  });
+
+  describe('when gulpfile.coffee exists with locally installed gulp', () => {
+    beforeEach(() => {
+      waitsForPromise(setupGulp.bind(null, 'coffee'));
+      runs(() => fs.writeFileSync(directory + 'gulpfile.coffee', fs.readFileSync(__dirname + '/fixture/gulpfile.coffee')));
+    });
+
+    it('should export correct settings', () => {
+      expect(builder.isEligible()).toEqual(true);
+      waitsForPromise(() => {
+        return builder.settings().then(settings => {
+          expect(settings.length).toBe(2);
+          expect(settings.map(s => s.name).sort()).toEqual([ 'Gulp: coffee-task-1', 'Gulp: coffee-task-2' ].sort());
+          const target = settings.find(s => s.name === 'Gulp: coffee-task-1');
+          expect(target.sh).toBe(false);
+          expect(target.args).toEqual([ 'coffee-task-1' ]);
           expect(target.exec).toBe(`${directory}node_modules/.bin/gulp`);
         });
       });
