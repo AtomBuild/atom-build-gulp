@@ -8,7 +8,8 @@ import { provideBuilder } from '../lib/gulp';
 
 describe('gulp provider', () => {
   let directory;
-  const builder = provideBuilder();
+  let builder;
+  const Builder = provideBuilder();
 
   const setupGulp = () => {
     const binGulp = path.join(directory, 'node_modules', '.bin', 'gulp');
@@ -29,7 +30,11 @@ describe('gulp provider', () => {
     waitsForPromise(() => {
       return specHelpers.vouch(temp.mkdir, 'atom-build-spec-')
         .then((dir) => specHelpers.vouch(fs.realpath, dir))
-        .then((dir) => atom.project.setPaths([ directory = `${dir}/` ]));
+        .then((dir) => {
+          directory = `${dir}/`;
+          builder = new Builder(directory);
+          atom.project.setPaths([ directory ]);
+        });
     });
   });
 
@@ -39,9 +44,9 @@ describe('gulp provider', () => {
 
   describe('when no gulpfile.js exists', () => {
     it('should not be eligible', () => {
-      expect(builder.isEligable(directory)).toEqual(false);
+      expect(builder.isEligible()).toEqual(false);
     });
-  })
+  });
 
   describe('when gulpfile.js exists with locally installed gulp', () => {
     beforeEach(() => {
@@ -50,12 +55,13 @@ describe('gulp provider', () => {
     });
 
     it('should be eligible', () => {
-      expect(builder.isEligable(directory)).toEqual(true);
+      expect(builder.isEligible()).toEqual(true);
     });
 
     it('should use gulp to list targets', () => {
+      expect(builder.isEligible()).toBe(true);
       waitsForPromise(() => {
-        return builder.settings(directory).then(settings => {
+        return builder.settings().then(settings => {
           const expected = [ 'Gulp: default', 'Gulp: dev build', 'Gulp: watch' ].sort();
           const real = settings.map(s => s.name).sort();
           expect(expected).toEqual(real);
@@ -65,7 +71,8 @@ describe('gulp provider', () => {
 
     it('should export correct settings', () => {
       waitsForPromise(() => {
-        return builder.settings(directory).then(settings => {
+        expect(builder.isEligible()).toBe(true);
+        return builder.settings().then(settings => {
           expect(settings.length).toBe(3);
           const target = settings.find(s => s.name === 'Gulp: watch');
           expect(target.sh).toBe(false);
@@ -73,7 +80,27 @@ describe('gulp provider', () => {
           expect(target.exec).toBe(`${directory}node_modules/.bin/gulp`);
         });
       });
-    })
+    });
+
+    it('should refresh targets when gulpfile.js is altered', () => {
+      waitsForPromise(() => {
+        expect(builder.isEligible()).toBe(true);
+        return builder.settings().then(settings => {
+          expect(settings.length).toBe(3);
+        });
+      });
+
+      runs(() => fs.appendFileSync(`${directory}/gulpfile.js`, `\ngulp.task("new task", [ "default" ]);\n`));
+
+      waitsForPromise(() => {
+        expect(builder.isEligible()).toBe(true);
+        return builder.settings().then(settings => {
+          expect(settings.length).toBe(4);
+          const target = settings.find(s => s.name === 'Gulp: new task');
+          expect(target.args).toEqual([ 'new task' ]);
+        });
+      });
+    });
   });
 
   describe('when gulpfile.js exists but no local gulp is installed', () => {
@@ -82,12 +109,12 @@ describe('gulp provider', () => {
     });
 
     it('should be eligible', () => {
-      runs(() => expect(builder.isEligable(directory)).toEqual(true));
+      runs(() => expect(builder.isEligible()).toEqual(true));
     });
 
     it('should list the default target', () => {
       waitsForPromise(() => {
-        return builder.settings(directory).then(settings => {
+        return builder.settings().then(settings => {
           const expected = [ 'Gulp: default' ];
           const real = settings.map(s => s.name);
           expect(expected).toEqual(real);
@@ -97,7 +124,7 @@ describe('gulp provider', () => {
 
     it('should export correct settings', () => {
       waitsForPromise(() => {
-        return builder.settings(directory).then(settings => {
+        return builder.settings().then(settings => {
           expect(settings.length).toBe(1);
           const target = settings.find(s => s.name === 'Gulp: default');
           expect(target.sh).toBe(false);
